@@ -74,16 +74,15 @@ int toTokens(char* str, char* tokstack)
         {
             if (*str == '-' && lastType != VAL) 
             {
+                tokstack[tindex] = '\0';
+                tindex++;
                 tokstack[tindex] = *str;
                 tindex++;
                 lastType = VAL;
                 continue;
             }
-            if (lastType == VAL || 1)
-            {
-                tokstack[tindex] = '\0';
-                tindex++;
-            }
+            tokstack[tindex] = '\0';
+            tindex++;
             tokstack[tindex] = *str;
             tindex++;
             lastType = OP;
@@ -182,7 +181,8 @@ int main(int argc, char* argv[])
         printf("c: %c\n", c);
         int tlen = strnlen(&tokstack[tokindex], STACK_SIZE - tokindex) + 1;
         // if the current token is a number
-        if (c == '.' || (c >= '0' && c <= '9'))
+        char d = tokstack[tokindex + 1];
+        if (c == '.' || (c >= '0' && c <= '9') || c == '-' && (d == '.' || (d >= '0' && d <= '9')))
         {
             popTo(tokstack, &tokindex, polish, &polindex);
             continue;
