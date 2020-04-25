@@ -79,7 +79,7 @@ int toTokens(char* str, char* tokstack)
                 lastType = VAL;
                 continue;
             }
-            if (lastType == VAL)
+            if (lastType == VAL || 1)
             {
                 tokstack[tindex] = '\0';
                 tindex++;
@@ -100,39 +100,59 @@ void addop(char op, int precedence, int associativity)
 
 int popTo(char* from, int* fromindex, char* to, int* toindex)
 {
-    //from[*fromindex] = '\0';
-    int len = *fromindex;
-
-    // go to either the first character or the previous null
-    while (fromindex > 0 && from[(*fromindex)--]);
-    // make it so that no matter what, we are pointing at the first char of the last element
-    len -= *fromindex;
-    //if (fromindex > 0) fromindex++;
-    printf("%d\n", len);
+    if ((*toindex) < STACK_SIZE - 1) { (*toindex)++; }
+    while ((*toindex) < STACK_SIZE - 1 && to[(*toindex) - 1]) { (*toindex)++; }
+    int len = strnlen(from + *fromindex, STACK_SIZE - *fromindex - 1) + 1;
     memcpy(to + *toindex, from + *fromindex, len);
-    *toindex += len;
     memset(from + *fromindex, 0, len);
-    return 1;
+    if ((*fromindex) > 0) { (*fromindex)--; }
+    else *fromindex = -1;
+    while (*(fromindex) > 0 && from[(*fromindex) - 1]) { (*fromindex)--; }
+}
+
+int tokrev(char* tokstack, int tokindex)
+{
+    char tmp[STACK_SIZE] = { 0 };
+    int newindex = 0;
+    while (tokindex >= 0)
+    {
+        popTo(tokstack, &tokindex, tmp, &newindex);
+    }
+    memcpy(tokstack, tmp, STACK_SIZE);
+    return newindex;
 }
 
 int pop(char* from, int* fromindex)
 {
-    //from[*fromindex] = '\0';
-    int len = *fromindex;
-
-    // go to either the first character or the previous null
-    while (fromindex > 0 && from[*fromindex--]);
-    // make it so that no matter what, we are pointing at the first char of the last element
-    len -= *fromindex;
-    //if (fromindex > 0) fromindex++;
+    int len = strnlen(from + *fromindex, STACK_SIZE - *fromindex - 1) + 1;
     memset(from + *fromindex, 0, len);
-    return 1;
+    if ((*fromindex) > 0) { (*fromindex)--; }
+    else *fromindex = -1;
+    while (*(fromindex) > 0 && from[(*fromindex) - 1]) { (*fromindex)--; }
 }
+
+char *strrev(char *str)
+{
+      char *p1, *p2;
+
+      if (! str || ! *str)
+            return str;
+      for (p1 = str, p2 = str + strlen(str) - 1; p2 > p1; ++p1, --p2)
+      {
+            *p1 ^= *p2;
+            *p2 ^= *p1;
+            *p1 ^= *p2;
+      }
+      return str;
+}
+
+
 
 int main(int argc, char* argv[])
 {
     char buf[STACK_SIZE / 2];
     fgets(buf, STACK_SIZE / 2, stdin);
+    
     //if (argc < 1) { return -1; }
     int len = strlen(buf);
 
@@ -141,6 +161,7 @@ int main(int argc, char* argv[])
     addop('/', 3, LEFT);
     addop('*', 3, LEFT);
     addop('^', 4, RIGHT);
+    //ops[0].prec = 100;
 
     char opstack[STACK_SIZE] = { 0 };
     int opindex = 0;
@@ -152,13 +173,14 @@ int main(int argc, char* argv[])
     int polindex = 0;
     int polindex_last = 0;
 
-    tokindex = toTokens(buf, tokstack);
-    tokindex_last = tokindex;
+    tokindex = toTokens(buf, tokstack) - 1;
+    while (tokindex > 0 && tokstack[tokindex - 1]) { tokindex--; }
+    tokindex = tokrev(tokstack, tokindex);
     while (tokindex >= 0)
     {
-        char c = tokstack[tokindex - 1];
+        char c = tokstack[tokindex];
         printf("c: %c\n", c);
-        int tlen = strnlen(&tokstack[tokindex - 1], STACK_SIZE - tokindex) + 1;
+        int tlen = strnlen(&tokstack[tokindex], STACK_SIZE - tokindex) + 1;
         // if the current token is a number
         if (c == '.' || (c >= '0' && c <= '9'))
         {
@@ -168,10 +190,12 @@ int main(int argc, char* argv[])
         // if the current token is an operator
         if (ops[c].op == c)
         {
-            char topPrec = ops[opstack[opindex - 1]].prec;
-            while (opindex >= 0 && opstack[opindex - 1] != '(' && (topPrec > ops[c].prec) || (topPrec == ops[c].prec && ops[c].assoc == LEFT))
+            char topPrec = ops[opstack[opindex]].prec;
+            printf("topPrec: %d\n", (int)topPrec);
+            while ((opindex > 0) && (opstack[opindex] != '(') && (topPrec > ops[c].prec) || (topPrec == ops[c].prec && ops[c].assoc == LEFT))
             {
                 popTo(opstack, &opindex, polish, &polindex);
+                topPrec = ops[opstack[opindex]].prec;
             }
             popTo(tokstack, &tokindex, opstack, &opindex);
             continue;
@@ -183,26 +207,29 @@ int main(int argc, char* argv[])
         }
         if (c == ')')
         {
-            while (opindex >= 0 && opstack[opindex - 1] != '(')
+            while (opindex > 0 && opstack[opindex] != '(')
             {
                 popTo(opstack, &opindex, polish, &polindex);
             }
-            if (opindex >= 0 && opstack[opindex - 1] == ')')
+            if (opstack[opindex] == '(')
             {
                 pop(opstack, &opindex);
             }
+            pop(tokstack, &tokindex);
             continue;
         }
     }
-    while (opindex >= 0)
+    while (opindex > 0)
     {
+        printf("c: %c\n", opstack[opindex]);
         popTo(opstack, &opindex, polish, &polindex);
     }
     polindex = 0;
     do
     {
-        printf("%s ", polish + polindex);
-        polindex += strlen(polish + polindex) + 1;
-    } while(polish[polindex]);
+        char c = polish[polindex];
+        if (c) { printf("%c", c); }
+        else { printf("_"); }
+    } while(polindex++ < STACK_SIZE - 1);
     exit(0);
 }
