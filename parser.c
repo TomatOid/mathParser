@@ -4,7 +4,7 @@
 #include <string.h>
 #define STACK_SIZE 512
 
-// Functions are right associative operators with high
+// Functions are right associative operators with high precedence
 
 typedef struct
 {
@@ -30,28 +30,9 @@ enum
 
 operator ops[256] = { 0 };
 
-//
-//typedef struct
-//{
-//    char type;
-//    union 
-//    {
-//        double val;
-//        double* var;
-//    };
-//} value;
-//
-//typedef struct
-//{
-//    char type;
-//    union
-//    {
-//        operator op;
-//        value val;
-//    };
-//} token;
-//
-
+// The purpose of this function is to seprate out digits and operators
+// it puts nulls between the strings as null is the natural delimiter
+// as I can use string.h functions on each token and also I hate strtok
 int toTokens(char* str, char* tokstack)
 {
     if (!str) { return -1; }
@@ -70,7 +51,7 @@ int toTokens(char* str, char* tokstack)
             tindex++;
             lastType = VAL;
         }
-        else if (*str == '^' || (*str >= '(' && *str <= '/'))
+        else if (*str == '^' || (*str >= '*' && *str <= '/'))
         {
             if (*str == '-' && lastType != VAL) 
             {
@@ -87,16 +68,26 @@ int toTokens(char* str, char* tokstack)
             tindex++;
             lastType = OP;
         }
-    } while(*(str++) && (tindex < STACK_SIZE - 1));
+        else if (*str == '(' || *str == ')')
+        {
+            tokstack[tindex] = '\0';
+            tindex++;
+            tokstack[tindex] = *str;
+            tindex++;
+            lastType = (*str == '(') ? OP : VAL;
+        }
+    } while (*(str++) && (tindex < STACK_SIZE - 1));
     return tindex;
 }
 
+// add an operator to the lookup table
 void addop(char op, int precedence, int associativity)
 {
     operator tmp = { .op = op, .prec = (char)precedence, .assoc = associativity };
     ops[(int)tmp.op] = tmp;
 }
 
+// pop a string token from one stack to another
 int popTo(char* from, int* fromindex, char* to, int* toindex)
 {
     if ((*toindex) < STACK_SIZE - 1) { (*toindex)++; }
@@ -109,6 +100,7 @@ int popTo(char* from, int* fromindex, char* to, int* toindex)
     while (*(fromindex) > 0 && from[(*fromindex) - 1]) { (*fromindex)--; }
 }
 
+// reverse a string stack token wise
 int tokrev(char* tokstack, int tokindex)
 {
     char tmp[STACK_SIZE] = { 0 };
@@ -121,6 +113,7 @@ int tokrev(char* tokstack, int tokindex)
     return newindex;
 }
 
+// pop a string to nowhere
 int pop(char* from, int* fromindex)
 {
     int len = strnlen(from + *fromindex, STACK_SIZE - *fromindex - 1) + 1;
@@ -130,28 +123,14 @@ int pop(char* from, int* fromindex)
     while (*(fromindex) > 0 && from[(*fromindex) - 1]) { (*fromindex)--; }
 }
 
-char *strrev(char *str)
-{
-      char *p1, *p2;
-
-      if (! str || ! *str)
-            return str;
-      for (p1 = str, p2 = str + strlen(str) - 1; p2 > p1; ++p1, --p2)
-      {
-            *p1 ^= *p2;
-            *p2 ^= *p1;
-            *p1 ^= *p2;
-      }
-      return str;
-}
-
-
-
 int main(int argc, char* argv[])
 {
     char buf[STACK_SIZE / 2];
-    fgets(buf, STACK_SIZE / 2, stdin);
-    
+    if (argc > 1) { memcpy(buf, argv[1], STACK_SIZE / 2); }
+    else
+    {
+        fgets(buf, STACK_SIZE / 2, stdin);
+    }
     //if (argc < 1) { return -1; }
     int len = strlen(buf);
 
@@ -164,13 +143,10 @@ int main(int argc, char* argv[])
 
     char opstack[STACK_SIZE] = { 0 };
     int opindex = 0;
-    int opindex_last = 0;
     char tokstack[STACK_SIZE] = { 0 };
     int tokindex = 0;
-    int tokindex_last = 0;
     char polish[STACK_SIZE] = { 0 };
     int polindex = 0;
-    int polindex_last = 0;
 
     tokindex = toTokens(buf, tokstack) - 1;
     while (tokindex > 0 && tokstack[tokindex - 1]) { tokindex--; }
@@ -178,7 +154,7 @@ int main(int argc, char* argv[])
     while (tokindex >= 0)
     {
         char c = tokstack[tokindex];
-        printf("c: %c\n", c);
+        //printf("c: %c\n", c);
         int tlen = strnlen(&tokstack[tokindex], STACK_SIZE - tokindex) + 1;
         // if the current token is a number
         char d = tokstack[tokindex + 1];
@@ -191,7 +167,7 @@ int main(int argc, char* argv[])
         if (ops[c].op == c)
         {
             char topPrec = ops[opstack[opindex]].prec;
-            printf("topPrec: %d\n", (int)topPrec);
+            //printf("topPrec: %d\n", (int)topPrec);
             while ((opindex > 0) && (opstack[opindex] != '(') && (topPrec > ops[c].prec) || (topPrec == ops[c].prec && ops[c].assoc == LEFT))
             {
                 popTo(opstack, &opindex, polish, &polindex);
@@ -221,7 +197,7 @@ int main(int argc, char* argv[])
     }
     while (opindex > 0)
     {
-        printf("c: %c\n", opstack[opindex]);
+        //printf("c: %c\n", opstack[opindex]);
         popTo(opstack, &opindex, polish, &polindex);
     }
     polindex = 0;
@@ -231,5 +207,6 @@ int main(int argc, char* argv[])
         if (c) { printf("%c", c); }
         else { printf("_"); }
     } while(polindex++ < STACK_SIZE - 1);
+    printf("\n");
     exit(0);
 }
